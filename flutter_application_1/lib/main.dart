@@ -4,9 +4,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 String _friendCode = '';
 List<String> _friendCodes = [
-  "12345678",
-  "87654321",
+  '{"uid": "20406080", "username": "bbpatel", "where": "Ford Dining Court", "since": "6:00pm"}',
+  '{"uid": "10305070", "username": "canineL", "where": "Wiley Dining Court", "since": "9:00pm"}',
+  '{"uid": "12345678", "username": "jackthe", "where": "Hillenbrand Dining Court", "since": "7:00pm"}',
+  '{"uid": "87654321", "username": "andrewB", "where": "Windsor Dining Court", "since": "10:00am"}',
 ];
+
+
+
+
 
 class UserData {
   String uid;
@@ -24,6 +30,17 @@ class UserData {
       where: json['where'],
       since:json['since']
     );
+
+    // to convert UserData into a string
+  }
+
+  String toJson() {
+    return jsonEncode({
+      'uid': uid,
+      'username': username,
+      'where': where,
+      'since': since,
+    });
   }
 
   String getUID() {
@@ -95,12 +112,6 @@ class _MyHomePageState extends State<_MyHomePage> {
           });
         }
       });
-      if (result == true) {
-        setState(() {
-          print(_friendCodes);
-          // Rebuild the page here
-        });
-      }
     } catch (e) {
       // Handle any exceptions here
     }
@@ -108,7 +119,13 @@ class _MyHomePageState extends State<_MyHomePage> {
 
   void _navigateToViewFriend() async {
     try {
-      final result = await Navigator.pushNamed(context, '/viewFriend');
+      final result = await Navigator.pushNamed(context, '/viewFriend').then((value) {
+        if (value != null) {
+          setState(() {
+            _friendCodes.remove(value.toString());
+          });
+        }
+      });
       if (result == true) {
         setState(() async {
           // Rebuild page here
@@ -137,15 +154,17 @@ class _MyHomePageState extends State<_MyHomePage> {
               child: ListView.builder(
                 itemCount: _friendCodes.length,
                 itemBuilder: (context, index) {
+                  UserData user = UserData.fromJson(json.decode(_friendCodes[index]));
                   return ElevatedButton(
                     onPressed: () {
+                      _friendCode = _friendCodes[index];
                       // navigate to the view friend profile for that friend
                       Navigator.push(
                         context, 
                         MaterialPageRoute(builder: (context) => ViewFriendPage()),
                       );
                     },
-                    child: Text(_friendCodes[index]),
+                    child: Text(user.getUsername()),
                   );
                 },
               ),
@@ -184,9 +203,18 @@ class _AddFriendPageState extends State<AddFriendPage> {
  
   final _controller = TextEditingController();
 
-  void _setFriendCode(String code) {
+  void _setFriendCode(String value) {
     setState(() {
-      _friendCode = code;
+      try {
+
+      // ask server for String value 
+      UserData user = UserData.fromJson(json.decode(_friendCodes[0]));
+      _friendCode = user.toJson();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Could not fetch user profile.')),
+        );
+      }
     });
   }
 
@@ -195,7 +223,8 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
       // prevent duplicates ... 
       // prevent shorty
-      if (_friendCode.length == 8 && RegExp(r'^[0-9]+$').hasMatch(_friendCode) && !_friendCodes.contains(_friendCode)) { // replace with call to server when available
+      UserData user = UserData.fromJson(json.decode(_friendCode));
+      if (user.getUID().length == 8 && RegExp(r'^[0-9]+$').hasMatch(user.getUID()) && !_friendCodes.contains(user.getUID())) { // replace with call to server when available
         Navigator.pop(context, _friendCode);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -269,7 +298,6 @@ class ViewFriendPage extends StatefulWidget{
 }
 
 class _ViewFriendPageState extends State<ViewFriendPage> {
-  
   // get user info 
   //void getUserInfo()
   //Map<String, dynamic> jsonMap = json.decode("string");
@@ -278,8 +306,17 @@ class _ViewFriendPageState extends State<ViewFriendPage> {
   String where;
   String since;*/
   UserData user = UserData.fromJson(json.decode(
-    '{"uid": "20406080", "username": "bbpatel", "where": "Ford Dining Court", "since": "7:00pm"}')
+    _friendCode)
     );
+
+    void _removeFriendCode() {
+      setState(() {
+
+      // prevent duplicates ... 
+      // prevent shorty
+      Navigator.pop(context, user.toJson());
+    });
+    }
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +346,14 @@ class _ViewFriendPageState extends State<ViewFriendPage> {
             Text(
               user.getSince(),
               style: TextStyle(fontSize: 14),
-            )
+            ),
+            SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                _removeFriendCode();
+              },
+              child: const Text('REMOVE FRIEND'),
+            ),
           ],
         ),
       ),
